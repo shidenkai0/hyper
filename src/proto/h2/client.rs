@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     convert::Infallible,
     future::Future,
     marker::PhantomData,
@@ -13,6 +14,7 @@ use futures_channel::mpsc::{Receiver, Sender};
 use futures_channel::{mpsc, oneshot};
 use futures_core::{ready, FusedFuture, FusedStream, Stream};
 use h2::client::{Builder, Connection, SendRequest};
+use h2::frame::{Priority, PseudoOrder, SettingsOrder};
 use h2::SendStream;
 use http::{Method, StatusCode};
 use pin_project_lite::pin_project;
@@ -76,6 +78,11 @@ pub(crate) struct Config {
     pub(crate) max_pending_accept_reset_streams: Option<usize>,
     pub(crate) header_table_size: Option<u32>,
     pub(crate) max_concurrent_streams: Option<u32>,
+    // -- HTTP/2 fingerprinting fields (phantomhttp patch) --
+    pub(crate) settings_order: Option<[SettingsOrder; 8]>,
+    pub(crate) pseudo_header_order: Option<[PseudoOrder; 4]>,
+    pub(crate) priority_frames: Option<Cow<'static, [Priority]>>,
+    pub(crate) initial_stream_id: Option<u32>,
 }
 
 impl Default for Config {
@@ -95,6 +102,10 @@ impl Default for Config {
             max_pending_accept_reset_streams: None,
             header_table_size: None,
             max_concurrent_streams: None,
+            settings_order: None,
+            pseudo_header_order: None,
+            priority_frames: None,
+            initial_stream_id: None,
         }
     }
 }
@@ -122,6 +133,19 @@ fn new_builder(config: &Config) -> Builder {
     }
     if let Some(max) = config.max_concurrent_streams {
         builder.max_concurrent_streams(max);
+    }
+    // -- HTTP/2 fingerprinting (phantomhttp patch) --
+    if let Some(order) = config.settings_order {
+        builder.settings_order(order);
+    }
+    if let Some(order) = config.pseudo_header_order {
+        builder.headers_psuedo(order);
+    }
+    if let Some(ref priority) = config.priority_frames {
+        builder.priority(priority.clone());
+    }
+    if let Some(stream_id) = config.initial_stream_id {
+        builder.initial_stream_id(stream_id);
     }
     builder
 }

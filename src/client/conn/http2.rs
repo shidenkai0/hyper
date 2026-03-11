@@ -465,6 +465,52 @@ where
         self
     }
 
+    /// Sets the SETTINGS frame parameter ordering for HTTP/2 fingerprinting.
+    ///
+    /// Different browsers send SETTINGS parameters in different orders.
+    /// This controls the order to match a specific browser's Akamai fingerprint.
+    pub fn http2_settings_order(
+        &mut self,
+        order: [h2::frame::SettingsOrder; 8],
+    ) -> &mut Self {
+        self.h2_builder.settings_order = Some(order);
+        self
+    }
+
+    /// Sets the pseudo-header ordering for HTTP/2 HEADERS frames.
+    ///
+    /// Different browsers send pseudo-headers (`:method`, `:authority`, etc.)
+    /// in different orders. Chrome uses m,a,s,p; Firefox uses m,p,a,s.
+    pub fn http2_pseudo_header_order(
+        &mut self,
+        order: [h2::frame::PseudoOrder; 4],
+    ) -> &mut Self {
+        self.h2_builder.pseudo_header_order = Some(order);
+        self
+    }
+
+    /// Sets PRIORITY frames to send at connection startup.
+    ///
+    /// Firefox sends 6 PRIORITY frames building a dependency tree before
+    /// the first HEADERS frame. Chrome 124+ sends none.
+    pub fn http2_priority_frames(
+        &mut self,
+        priorities: std::borrow::Cow<'static, [h2::frame::Priority]>,
+    ) -> &mut Self {
+        self.h2_builder.priority_frames = Some(priorities);
+        self
+    }
+
+    /// Sets the first stream ID for HTTP/2 requests.
+    ///
+    /// When PRIORITY frames are configured, the first request stream ID
+    /// must be higher than all priority stream IDs. For example, Firefox
+    /// uses priority streams 3-13, so the first request starts at 15.
+    pub fn http2_initial_stream_id(&mut self, stream_id: u32) -> &mut Self {
+        self.h2_builder.initial_stream_id = Some(stream_id);
+        self
+    }
+
     /// Constructs a connection with the configured options and IO.
     /// See [`client::conn`](crate::client::conn) for more.
     ///
